@@ -1,6 +1,6 @@
-import { availableDrillThrus } from "metabase-lib/drills";
 import { displayInfo } from "metabase-lib/metadata";
 import { orderableColumns } from "metabase-lib/order_by";
+import { availableDrillThrus } from "./drills";
 import { columnFinder, createQuery } from "./test-helpers";
 
 describe("availableDrillThrus", () => {

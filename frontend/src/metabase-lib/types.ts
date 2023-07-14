@@ -161,6 +161,10 @@ export type JoinStrategyDisplayInfo = {
 declare const DrillThru: unique symbol;
 export type DrillThru = unknown & { _opaque: typeof DrillThru };
 
+export type DrillThruDisplayInfo = {
+  type: string;
+};
+
 export interface Dimension {
   column: Record<string, unknown>;
   value?: any;

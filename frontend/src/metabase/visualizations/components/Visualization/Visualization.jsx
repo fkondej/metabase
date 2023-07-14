@@ -236,22 +236,29 @@ class Visualization extends PureComponent {
     const question = this._getQuestionForCardCached(metadata, card);
     const mode = this.getMode(this.props.mode, question);
 
+    // TODO: find a way to add "extraData" to drills
     const extraData = getExtraDataForClick(clicked);
-    if (extraData && Object.keys(extraData).length > 0) {
-      //debugger;
-    }
 
     if (mode) {
-      window.__q = question._getMLv2Query();
+      const query = question._getMLv2Query();
+      // window.__q = query;
+      const stageIndex = -1;
+
       const mlv2Drills = Lib.availableDrillThrus(
-        window.__q,
-        -1,
+        query,
+        stageIndex,
         clicked.column,
         clicked.value,
         clicked.data,
       );
+
+      // TODO: remove this after debugging
       if (mlv2Drills && mlv2Drills.length > 0) {
-        //console.log(question, clicked?.column, clicked?.value, mlv2Drills);
+        // eslint-disable-next-line no-console
+        console.log(
+          mlv2Drills.map(drill => Lib.displayInfo(query, stageIndex, drill)),
+          extraData,
+        );
       }
     }
 
