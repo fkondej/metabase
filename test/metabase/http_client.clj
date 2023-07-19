@@ -4,11 +4,13 @@
    [cheshire.core :as json]
    [clj-http.client :as http]
    [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [clojure.string :as str]
    [clojure.test :as t]
    [java-time]
    [metabase.config :as config]
+   [metabase.server.handler :as handler]
    [metabase.server.middleware.session :as mw.session]
    [metabase.test-runner.assert-exprs :as test-runner.assert-exprs]
    [metabase.test.initialize :as initialize]
@@ -16,8 +18,12 @@
    [metabase.util.date-2 :as u.date]
    [metabase.util.log :as log]
    [metabase.util.schema :as su]
+   [ring.mock.request :as ring.mock]
    [ring.util.codec :as codec]
-   [schema.core :as schema]))
+   [schema.core :as schema])
+  (:import
+   (metabase.async.streaming_response StreamingResponse)
+   (java.io PipedInputStream)))
 
 (set! *warn-on-reflection* true)
 
@@ -195,6 +201,23 @@
    (schema/optional-key :query-parameters) (schema/maybe su/Map)
    (schema/optional-key :request-options)  (schema/maybe su/Map)})
 
+(defn- build-header
+  [req headers]
+  (reduce (fn [acc [k v]]
+              (ring.mock.request/header acc k v))
+          req
+          headers))
+
+(defn- build-mock-request
+  [method url headers http-body]
+  (merge (cond-> (ring.mock/request method url)
+           http-body
+           (ring.mock/json-body http-body)
+
+           headers
+           (build-header headers))
+         {:content-type :json}))
+
 (schema/defn ^:private -client
   ;; Since the params for this function can get a little complicated make sure we validate them
   [{:keys [credentials method expected-status url http-body query-parameters request-options]} :- ClientParamsMap]
@@ -205,9 +228,21 @@
         url         (build-url url query-parameters)
         method-name (u/upper-case-en (name method))
         _           (log/debug method-name (pr-str url) (pr-str request-map))
+        req         (build-mock-request method url (:headers request-map) http-body)
         thunk       (fn []
                       (try
-                        (request-fn url request-map)
+                        (let [resp (metabase.server.handler/app req identity identity)]
+                          (update resp :body
+                                  (fn [body]
+                                    (cond
+                                      (instance? PipedInputStream body)
+                                      (with-open [r (clojure.java.io/reader body)]
+                                        (slurp r))
+
+                                      #_(instance? StreamingResponse body)
+                                      :else
+                                      body))))
+                        #_(request-fn url request-map)
                         (catch clojure.lang.ExceptionInfo e
                           (log/debug e method-name url)
                           (ex-data e))
